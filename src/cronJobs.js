@@ -2,12 +2,12 @@ const cron = require('node-cron');
 const redisService = require('./services/redisService');
 const {getTimenow} = require('./time')
 
-let fiveSecondsTask;
+let task;
 
 // 导出定时任务的控制接口，以便在应用程序中手动启动和停止
 module.exports = {
   start: () => {
-    fiveSecondsTask = cron.schedule('*/30 * * * * *', async () => {
+    task = cron.schedule('*/30 * * * * *', async () => {
       try {
         const startTime = new Date();
         const updatedCount = await redisService.updateAllScores(getTimenow());
@@ -19,14 +19,14 @@ module.exports = {
       }
     });
 
-    console.log('Five seconds task started.');
+    console.log('task started.');
   },
   stop: () => {
-    if (fiveSecondsTask) {
-      fiveSecondsTask.stop();
-      console.log('Five seconds task stopped.');
+    if (task) {
+      task.stop();
+      console.log('task stopped.');
     } else {
-      console.log('Five seconds task is not running.');
+      console.log('task is not running.');
     }
   },
 };
