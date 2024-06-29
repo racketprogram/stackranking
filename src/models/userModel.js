@@ -73,7 +73,7 @@ exports.getLeaderboard = async (limit) => {
         const [userId] = leaderboard[i].split(':');
         const score = parseFloat(leaderboard[i + 1]);
         const username = usernameMap[userId] || 'Unknown User';
-        result.push({ userId, username, score });
+        result.push({ rank: i/2+1, userId, name: username, scores: score });
     }
 
     return result;

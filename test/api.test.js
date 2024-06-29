@@ -24,7 +24,6 @@ describe('Staking Points API Tests', function () {
     });
 
     it('should stake assets for the user', async () => {
-        await sleep(1000)
         const response = await axios.post(`${API_URL}/user/${userId}/stake`, {
             apple: 1,
             banana: 0,
@@ -38,12 +37,11 @@ describe('Staking Points API Tests', function () {
     });
 
     it('should get user assets', async () => {
-        await sleep(1000)
         const response = await axios.get(`${API_URL}/user/${userId}/assets`);
 
-        console.log("userId: ", userId)
-        console.log("score: ", response.data.score)
-        console.log("rank: ", response.data.rank)
+        // console.log("userId: ", userId)
+        // console.log("score: ", response.data.score)
+        // console.log("rank: ", response.data.rank)
         expect(response.status).to.equal(200);
         expect(response.data).to.have.property('apple', 1);
         expect(response.data).to.have.property('banana', 0);
@@ -53,16 +51,16 @@ describe('Staking Points API Tests', function () {
     });
 
       it('should get leaderboard', async () => {
-        const response = await axios.get(`${API_URL}/leaderboard?limit=10`);
+        const response = await axios.get(`${API_URL}/leaderboard?limit=300`);
 
-        for (const d of response.data) {
-            console.log(d)
-        }
+        // for (const d of response.data) {
+        //     console.log(d.rank, d.userId, d.scores)
+        // }
         
         expect(response.status).to.equal(200);
         expect(response.data).to.be.an('array');
-        expect(response.data.length).to.be.at.most(10);
-        expect(response.data[0]).to.have.all.keys('userId', 'username', 'score');
+        expect(response.data.length).to.be.at.most(300);
+        expect(response.data[0]).to.have.all.keys('rank', 'userId', 'name', 'scores');
       });
       
 
