@@ -2,6 +2,12 @@ const dbService = require('../services/dbService');
 const redisService = require('../services/redisService');
 const { getTimenow } = require('../time')
 
+function formatTimestamp(seconds) {
+    const date = new Date(seconds * 1000); // 将秒数转换为毫秒数
+    const isoString = date.toISOString(); // 获取 ISO 8601 格式的字符串
+    return isoString;
+}
+
 exports.createUser = async (username) => {
     const now = getTimenow()
     const result = await dbService.query(
@@ -30,16 +36,18 @@ exports.withdraw = async (userId, apple, banana, kiwi) => {
 };
 
 exports.getUserAssets = async (userId) => {
-    const result = await dbService.query('SELECT * FROM users WHERE id = $1', [userId]);
+    const now = getTimenow()
+    const result = await dbService.query('SELECT id, username FROM users WHERE id = $1', [userId]);
     const user = result.rows[0];
     if (!user) {
         throw new Error('User not found');
     }
 
-    const redisData = await redisService.updateScoreAndGetRank(userId, getTimenow());
+    const redisData = await redisService.updateScoreAndGetRank(userId, now);
 
     return {
         ...user,
+        last_update: formatTimestamp(now),
         ...redisData,
     };
 };
