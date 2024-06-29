@@ -1,15 +1,19 @@
 -- 計算分數的輔助函數
+-- local function calculateScore(apple, banana, kiwi, timeDiff)
+--     return apple * 100 * timeDiff + banana * 20 * timeDiff + kiwi * 10 * timeDiff
+-- end
+
 local function calculateScore(apple, banana, kiwi, timeDiff)
-    return apple * 100 * timeDiff + banana * 20 * timeDiff + kiwi * 10 * timeDiff
+    return apple * 1 * timeDiff + banana * 1 * timeDiff + kiwi * 1 * timeDiff
 end
 
--- 更新单个用户的分数
+-- 更新单个用户的分数（使用增量值）
 local function updateSingleUserScore(KEYS, ARGV)
     local USER_SCORES_SET = KEYS[1]
     local userId = ARGV[1]
-    local finalApple = tonumber(ARGV[2])
-    local finalBanana = tonumber(ARGV[3])
-    local finalKiwi = tonumber(ARGV[4])
+    local incrementApple = tonumber(ARGV[2])  -- 增量值，不是最终值
+    local incrementBanana = tonumber(ARGV[3]) -- 增量值，不是最终值
+    local incrementKiwi = tonumber(ARGV[4])   -- 增量值，不是最终值
     local now = tonumber(ARGV[5])
 
     -- 獲取用戶當前的數據
@@ -21,23 +25,32 @@ local function updateSingleUserScore(KEYS, ARGV)
         currentScore, oldApple, oldBanana, oldKiwi, lastUpdate = tonumber(currentScore), tonumber(oldApple), tonumber(oldBanana), tonumber(oldKiwi), tonumber(lastUpdate)
     end
 
+    local newApple = oldApple + incrementApple
+    local newBanana = oldBanana + incrementBanana
+    local newKiwi = oldKiwi + incrementKiwi
+
+    if newApple < 0 or newBanana < 0 or newKiwi < 0 then
+        return redis.error_reply("stack values cannot be negative")
+    end
+
     -- 計算舊水果的得分
     local timeDiff = now - lastUpdate
     local oldScore = calculateScore(oldApple, oldBanana, oldKiwi, timeDiff)
 
-    -- 更新總分
+    -- 更新總分（加上增量）
     local newScore = currentScore + oldScore
 
     -- 創建新的用戶數據
-    local newUserData = string.format("%d:%d,%d,%d,%d", newScore, finalApple, finalBanana, finalKiwi, now)
+    local newUserData = string.format("%d:%d,%d,%d,%d", newScore, newApple, newBanana, newKiwi, now)
 
     -- 更新 sorted set，使用新的總分作為分數
     redis.call('ZADD', USER_SCORES_SET, newScore, userId)
     -- 更新用户数据
     redis.call('HSET', USER_SCORES_SET .. ':data', userId, newUserData)
 
-    return newScore
+    return {newScore,  newApple, newBanana, newKiwi}
 end
+
 
 -- 更新所有用戶的分數
 local function updateAllScores(KEYS, ARGV)
@@ -103,7 +116,7 @@ local function updateScoreAndGetRank(KEYS, ARGV)
     -- 獲取更新後的排名
     local rank = redis.call('ZREVRANK', USER_SCORES_SET, userId)
 
-    return {newScore, rank}
+    return {newScore, rank, apple, banana, kiwi}
 end
 
 

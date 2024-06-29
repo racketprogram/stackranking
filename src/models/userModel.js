@@ -1,41 +1,32 @@
 const dbService = require('../services/dbService');
 const redisService = require('../services/redisService');
-const {getTimenow} = require('../time')
+const { getTimenow } = require('../time')
 
 exports.createUser = async (username) => {
     const now = getTimenow()
     const result = await dbService.query(
-        'INSERT INTO users(username, apple, banana, kiwi, last_update) VALUES($1, 0, 0, 0, to_timestamp($2)) RETURNING id, username, apple, banana, kiwi, last_update',
+        'INSERT INTO users(username, last_update) VALUES($1, to_timestamp($2)) RETURNING id, username, last_update',
         [username, now]
     );
     const user = result.rows[0];
-    await redisService.updateSingleUserScore(user.id, user.apple, user.banana, user.kiwi, now);
+    await redisService.updateSingleUserScore(user.id, 0, 0, 0, now);
     return user;
 };
 
 exports.stake = async (userId, apple, banana, kiwi) => {
     const now = getTimenow()
-    const result = await dbService.query(
-        'UPDATE users SET apple = apple + $2, banana = banana + $3, kiwi = kiwi + $4, last_update = to_timestamp($5) WHERE id = $1 RETURNING *',
-        [userId, apple || 0, banana || 0, kiwi || 0, now]
-    );
-    const user = result.rows[0];
-    await redisService.updateSingleUserScore(user.id, user.apple, user.banana, user.kiwi, now);
-    return user;
+    const result = await redisService.updateSingleUserScore(userId, apple, banana, kiwi, now);
+    return result;
 };
 
 exports.withdraw = async (userId, apple, banana, kiwi) => {
     const now = getTimenow()
-    const result = await dbService.query(
-        'UPDATE users SET apple = apple - $2, banana = banana - $3, kiwi = kiwi - $4, last_update = to_timestamp($5) WHERE id = $1 AND apple >= $2 AND banana >= $3 AND kiwi >= $4 RETURNING *',
-        [userId, apple || 0, banana || 0, kiwi || 0, now]
-    );
-    if (result.rows.length === 0) {
+    try {
+        const result = await redisService.updateSingleUserScore(userId, -apple || 0, -banana || 0, -kiwi || 0, now);
+        return result;
+    } catch (err) {
         throw new Error('Insufficient assets');
     }
-    const user = result.rows[0];
-    await redisService.updateSingleUserScore(user.id, user.apple, user.banana, user.kiwi, now);
-    return user;
 };
 
 exports.getUserAssets = async (userId) => {
@@ -49,8 +40,7 @@ exports.getUserAssets = async (userId) => {
 
     return {
         ...user,
-        score: redisData.score,
-        rank: redisData.rank
+        ...redisData,
     };
 };
 
@@ -77,7 +67,7 @@ exports.getLeaderboard = async (limit) => {
         const [userId] = leaderboard[i].split(':');
         const score = parseFloat(leaderboard[i + 1]);
         const username = usernameMap[userId] || 'Unknown User';
-        result.push({ rank: i/2+1, userId, name: username, scores: score });
+        result.push({ rank: i / 2 + 1, userId, name: username, scores: score });
     }
 
     return result;
