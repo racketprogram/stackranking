@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const redisService = require('./services/redisService');
+const {getTimenow} = require('./time')
 
 let fiveSecondsTask;
 
@@ -9,7 +10,7 @@ module.exports = {
     fiveSecondsTask = cron.schedule('*/30 * * * * *', async () => {
       try {
         const startTime = new Date();
-        const updatedCount = await redisService.updateAllScores();
+        const updatedCount = await redisService.updateAllScores(getTimenow());
         const endTime = new Date();
         const elapsedTime = endTime - startTime;
         console.log(`Updated scores for ${updatedCount} users in ${elapsedTime} ms`);

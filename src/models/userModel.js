@@ -1,36 +1,40 @@
 const dbService = require('../services/dbService');
 const redisService = require('../services/redisService');
+const {getTimenow} = require('../time')
 
 exports.createUser = async (username) => {
+    const now = getTimenow()
     const result = await dbService.query(
-        'INSERT INTO users(username, apple, banana, kiwi, last_update) VALUES($1, 0, 0, 0, NOW()) RETURNING id, username, apple, banana, kiwi, last_update',
-        [username]
+        'INSERT INTO users(username, apple, banana, kiwi, last_update) VALUES($1, 0, 0, 0, to_timestamp($2)) RETURNING id, username, apple, banana, kiwi, last_update',
+        [username, now]
     );
     const user = result.rows[0];
-    await redisService.updateSingleUserScore(user.id, user.apple, user.banana, user.kiwi);
+    await redisService.updateSingleUserScore(user.id, user.apple, user.banana, user.kiwi, now);
     return user;
 };
 
 exports.stake = async (userId, apple, banana, kiwi) => {
+    const now = getTimenow()
     const result = await dbService.query(
-        'UPDATE users SET apple = apple + $2, banana = banana + $3, kiwi = kiwi + $4, last_update = NOW() WHERE id = $1 RETURNING *',
-        [userId, apple || 0, banana || 0, kiwi || 0]
+        'UPDATE users SET apple = apple + $2, banana = banana + $3, kiwi = kiwi + $4, last_update = to_timestamp($5) WHERE id = $1 RETURNING *',
+        [userId, apple || 0, banana || 0, kiwi || 0, now]
     );
     const user = result.rows[0];
-    await redisService.updateSingleUserScore(user.id, user.apple, user.banana, user.kiwi);
+    await redisService.updateSingleUserScore(user.id, user.apple, user.banana, user.kiwi, now);
     return user;
 };
 
 exports.withdraw = async (userId, apple, banana, kiwi) => {
+    const now = getTimenow()
     const result = await dbService.query(
-        'UPDATE users SET apple = apple - $2, banana = banana - $3, kiwi = kiwi - $4, last_update = NOW() WHERE id = $1 AND apple >= $2 AND banana >= $3 AND kiwi >= $4 RETURNING *',
-        [userId, apple || 0, banana || 0, kiwi || 0]
+        'UPDATE users SET apple = apple - $2, banana = banana - $3, kiwi = kiwi - $4, last_update = to_timestamp($5) WHERE id = $1 AND apple >= $2 AND banana >= $3 AND kiwi >= $4 RETURNING *',
+        [userId, apple || 0, banana || 0, kiwi || 0, now]
     );
     if (result.rows.length === 0) {
         throw new Error('Insufficient assets');
     }
     const user = result.rows[0];
-    await redisService.updateSingleUserScore(user.id, user.apple, user.banana, user.kiwi);
+    await redisService.updateSingleUserScore(user.id, user.apple, user.banana, user.kiwi, now);
     return user;
 };
 
@@ -41,7 +45,7 @@ exports.getUserAssets = async (userId) => {
         throw new Error('User not found');
     }
 
-    const redisData = await redisService.updateScoreAndGetRank(userId);
+    const redisData = await redisService.updateScoreAndGetRank(userId, getTimenow());
 
     return {
         ...user,

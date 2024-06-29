@@ -22,7 +22,7 @@ local function updateSingleUserScore(KEYS, ARGV)
     end
 
     -- 計算舊水果的得分
-    local timeDiff = math.floor((now - lastUpdate) / 1000)
+    local timeDiff = now - lastUpdate
     local oldScore = calculateScore(oldApple, oldBanana, oldKiwi, timeDiff)
 
     -- 更新總分
@@ -59,7 +59,7 @@ local function updateAllScores(KEYS, ARGV)
             
             currentScore, apple, banana, kiwi, lastUpdate = tonumber(currentScore), tonumber(apple), tonumber(banana), tonumber(kiwi), tonumber(lastUpdate)
             
-            local timeDiff = math.floor((now - lastUpdate) / 1000)
+            local timeDiff = now - lastUpdate
             local newScore = currentScore + calculateScore(apple, banana, kiwi, timeDiff)
             
             local newUserData = string.format("%d:%d,%d,%d,%d", newScore, apple, banana, kiwi, now)
@@ -91,7 +91,7 @@ local function updateScoreAndGetRank(KEYS, ARGV)
     currentScore, apple, banana, kiwi, lastUpdate = tonumber(currentScore), tonumber(apple), tonumber(banana), tonumber(kiwi), tonumber(lastUpdate)
 
     -- 計算新的分數
-    local timeDiff = math.floor((now - lastUpdate) / 1000)
+    local timeDiff = now - lastUpdate
     local scoreIncrease = calculateScore(apple, banana, kiwi, timeDiff)
     local newScore = currentScore + scoreIncrease
 
