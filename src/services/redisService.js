@@ -1,31 +1,57 @@
-const redisClient = require('../config/redis');
+const redisClients = require('../config/redis');
 const fs = require('fs');
 const path = require('path');
 
 const updateScoresScript = fs.readFileSync(path.join(__dirname, '../scripts/updateScores.lua'), 'utf8');
 
-// 輔助函數：獲取分片 key
-function getShardKey(userId) {
-  return `user_scores:${userId % 10}`;
+// 函數：為單個 Redis 客戶端加載腳本
+async function loadScriptForClient(client) {
+  try {
+    const sha1 = await client.script('LOAD', updateScoresScript);
+    client.scriptSHA1 = sha1;
+  } catch (error) {
+    console.error('Error loading script for client:', error);
+    throw error
+  }
+}
+
+// 為所有 Redis 客戶端加載腳本
+async function loadScriptsForAllClients() {
+  const loadPromises = redisClients.map(loadScriptForClient);
+  await Promise.all(loadPromises);
+  console.log('Scripts loaded for all Redis clients');
+}
+
+// 在模塊初始化時加載腳本
+loadScriptsForAllClients();
+
+const SHARD_COUNT = 10;
+
+// 輔助函數：獲取分片 key 和對應的 Redis 客戶端
+function getShardInfo(userId) {
+  const shardIndex = userId % SHARD_COUNT;
+  return {
+    shardKey: `user_scores:${shardIndex}`,
+    client: redisClients[shardIndex]
+  };
 }
 
 module.exports = {
   zrevrange: async (userId, start, stop, withScores) => {
-    const shardKey = getShardKey(userId);
-    return redisClient.zrevrange(shardKey, start, stop, withScores);
+    const { shardKey, client } = getShardInfo(userId);
+    return client.zrevrange(shardKey, start, stop, withScores);
   },
 
   zscore: async (userId, member) => {
-    const shardKey = getShardKey(userId);
-    return redisClient.zscore(shardKey, member);
+    const { shardKey, client } = getShardInfo(userId);
+    return client.zscore(shardKey, member);
   },
 
   updateAllScores: async (now) => {
-    const sha1 = await redisClient.script('LOAD', updateScoresScript);
-
-    const updatePromises = Array.from({ length: 10 }, (_, i) => {
+    const updatePromises = Array.from({ length: SHARD_COUNT }, (_, i) => {
       const shardKey = `user_scores:${i}`;
-      return redisClient.evalsha(sha1, 1, shardKey, now);
+      const client = redisClients[i];
+      return client.evalsha(client.scriptSHA1, 1, shardKey, now);
     });
 
     const results = await Promise.all(updatePromises);
@@ -36,24 +62,22 @@ module.exports = {
   },
 
   updateSingleUserScore: async (userId, xApple, xBanana, xKiwi, now) => {
-    const sha1 = await redisClient.script('LOAD', updateScoresScript);
-    const shardKey = getShardKey(userId);
-    const [score, apple, banana, kiwi] = await redisClient.evalsha(sha1, 1, shardKey, userId, xApple, xBanana, xKiwi, now);
+    const { shardKey, client } = getShardInfo(userId);
+    const [score, apple, banana, kiwi] = await client.evalsha(client.scriptSHA1, 1, shardKey, userId, xApple, xBanana, xKiwi, now);
     return { score, apple, banana, kiwi };
   },
 
   updateScoreAndGetRank: async (userId, now) => {
-    const sha1 = await redisClient.script('LOAD', updateScoresScript);
-    const shardKey = getShardKey(userId);
-    let [score, rank, apple, banana, kiwi] = await redisClient.evalsha(sha1, 1, shardKey, userId, now);
+    const { shardKey, client } = getShardInfo(userId);
+    let [score, rank, apple, banana, kiwi] = await client.evalsha(client.scriptSHA1, 1, shardKey, userId, now);
     rank = rank !== null ? rank + 1 : -1; // 加1使排名從1開始
     return { score, rank, apple, banana, kiwi };
   },
 
   // 获取所有分片的前 limit 个成员并合并排序
   zrevrangeAcrossShards: async (limit, withScores) => {
-    const shardKeys = Array.from({ length: 10 }, (_, i) => `user_scores:${i}`);
-    const promises = shardKeys.map(shardKey => redisClient.zrevrange(shardKey, 0, limit - 1, 'WITHSCORES'));
+    const shardKeys = Array.from({ length: SHARD_COUNT }, (_, i) => `user_scores:${i}`);
+    const promises = shardKeys.map((shardKey, i) => redisClients[i].zrevrange(shardKey, 0, limit - 1, 'WITHSCORES'));
     const results = await Promise.all(promises);
 
     // 合併結果並轉換為 [userId, score] 對
