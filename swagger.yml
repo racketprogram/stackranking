@@ -1,0 +1,175 @@
+openapi: 3.0.0
+info:
+  title: Staking Points System API
+  version: 1.0.0
+  description: API for managing user assets and staking in the Staking Points System
+
+paths:
+  /api/register:
+    post:
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  username:
+                    type: string
+                  last_update:
+                    type: string
+                    format: date-time
+
+  /api/user/{userId}/stake:
+    post:
+      summary: Stake assets for a user
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                apple:
+                  type: integer
+                banana:
+                  type: integer
+                kiwi:
+                  type: integer
+      responses:
+        '200':
+          description: Assets staked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  score:
+                    type: number
+                  apple:
+                    type: integer
+                  banana:
+                    type: integer
+                  kiwi:
+                    type: integer
+
+  /api/user/{userId}/withdraw:
+    post:
+      summary: Withdraw assets for a user
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                apple:
+                  type: integer
+                banana:
+                  type: integer
+                kiwi:
+                  type: integer
+      responses:
+        '200':
+          description: Assets withdrawn successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  score:
+                    type: number
+                  apple:
+                    type: integer
+                  banana:
+                    type: integer
+                  kiwi:
+                    type: integer
+
+  /api/user/{userId}/assets:
+    get:
+      summary: Get user assets
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User assets retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  username:
+                    type: string
+                  last_update:
+                    type: string
+                    format: date-time
+                  score:
+                    type: number
+                  rank:
+                    type: integer
+                  apple:
+                    type: integer
+                  banana:
+                    type: integer
+                  kiwi:
+                    type: integer
+
+  /api/leaderboard:
+    get:
+      summary: Get leaderboard
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Leaderboard retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    rank:
+                      type: integer
+                    userId:
+                      type: string
+                    name:
+                      type: string
+                    scores:
+                      type: number
