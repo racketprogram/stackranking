@@ -53,7 +53,7 @@ exports.getUserAssets = async (userId) => {
 };
 
 exports.getLeaderboard = async (limit) => {
-    const leaderboard = await redisService.zrevrange('user_scores', 0, limit - 1, 'WITHSCORES');
+    const leaderboard = await redisService.zrevrangeAcrossShards(limit, 'WITHSCORES');
 
     // 提取所有用戶 ID
     const userIds = leaderboard.filter((_, index) => index % 2 === 0).map(item => item.split(':')[0]);
