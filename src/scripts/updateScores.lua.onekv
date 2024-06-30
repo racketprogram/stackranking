@@ -1,0 +1,149 @@
+-- 计算分数的辅助函数
+-- local function calculateScore(apple, banana, kiwi, timeDiff)
+--     return apple * 100 * timeDiff + banana * 20 * timeDiff + kiwi * 10 * timeDiff
+-- end
+
+local function calculateScore(apple, banana, kiwi, timeDiff)
+    return apple * 1 * timeDiff + banana * 1 * timeDiff + kiwi * 1 * timeDiff
+end
+
+-- 编码用户数据为数字
+local function encodeUserData(score, apple, banana, kiwi, timestamp)
+    return math.floor(score * 1e8 + apple * 1e6 + banana * 1e4 + kiwi * 1e2 + (timestamp % 60))
+end
+
+-- 解码数字为用户数据
+local function decodeUserData(encodedData)
+    local timestamp = encodedData % 100
+    encodedData = math.floor(encodedData / 100)
+    local kiwi = encodedData % 100
+    encodedData = math.floor(encodedData / 100)
+    local banana = encodedData % 100
+    encodedData = math.floor(encodedData / 100)
+    local apple = encodedData % 100
+    local score = math.floor(encodedData / 100)
+    return score, apple, banana, kiwi, timestamp
+end
+
+local function getTimediff(now, lastUpdate)
+    local nowMod = now % 60
+    if nowMod > lastUpdate then
+        return nowMod - lastUpdate
+    else
+        return 60 - lastUpdate + nowMod
+    end
+end
+
+-- 更新单个用户的分数（使用增量值）
+local function updateSingleUserScore(KEYS, ARGV)
+    local USER_SCORES_SET = KEYS[1]
+    local userId = ARGV[1]
+    local incrementApple = tonumber(ARGV[2])
+    local incrementBanana = tonumber(ARGV[3])
+    local incrementKiwi = tonumber(ARGV[4])
+    local now = tonumber(ARGV[5])
+
+    -- 获取用户当前的数据
+    local encodedData = redis.call('ZSCORE', USER_SCORES_SET, userId)
+    local currentScore, oldApple, oldBanana, oldKiwi, lastUpdate = 0, 0, 0, 0, now
+
+    if encodedData then
+        currentScore, oldApple, oldBanana, oldKiwi, lastUpdate = decodeUserData(encodedData)
+    end
+
+    local newApple = oldApple + incrementApple
+    local newBanana = oldBanana + incrementBanana
+    local newKiwi = oldKiwi + incrementKiwi
+
+    if newApple < 0 or newBanana < 0 or newKiwi < 0 then
+        return redis.error_reply("stack values cannot be negative")
+    end
+
+    -- 计算新的分数
+    local timeDiff = getTimediff(now, lastUpdate)
+    local scoreIncrease = calculateScore(oldApple, oldBanana, oldKiwi, timeDiff)
+    local newScore = currentScore + scoreIncrease
+
+    -- 编码新的用户数据
+    local newEncodedData = encodeUserData(newScore, newApple, newBanana, newKiwi, now)
+
+    -- 更新 sorted set
+    redis.call('ZADD', USER_SCORES_SET, newEncodedData, userId)
+
+    return {newScore, newApple, newBanana, newKiwi}
+end
+
+-- 更新所有用户的分数
+local function updateAllScores(KEYS, ARGV)
+    local USER_SCORES_SET = KEYS[1]
+    local now = tonumber(ARGV[1])
+
+    local cursor = "0"
+    local count = 0
+
+    repeat
+        local result = redis.call("ZSCAN", USER_SCORES_SET, cursor, "COUNT", 1000)
+        cursor = result[1]
+        local members = result[2]
+        
+        for i = 1, #members, 2 do
+            local userId = members[i]
+            local encodedData = tonumber(members[i+1])
+            local currentScore, apple, banana, kiwi, lastUpdate = decodeUserData(encodedData)
+            
+            local timeDiff = getTimediff(now, lastUpdate)
+            local scoreIncrease = calculateScore(apple, banana, kiwi, timeDiff)
+            local newScore = currentScore + scoreIncrease
+            
+            local newEncodedData = encodeUserData(newScore, apple, banana, kiwi, now)
+            
+            redis.call('ZADD', USER_SCORES_SET, newEncodedData, userId)
+            
+            count = count + 1
+        end
+    until cursor == "0"
+
+    return count
+end
+
+-- 更新分数并获取排名，不改变水果数量
+local function updateScoreAndGetRank(KEYS, ARGV)
+    local USER_SCORES_SET = KEYS[1]
+    local userId = ARGV[1]
+    local now = tonumber(ARGV[2])
+
+    -- 获取用户当前的数据
+    local encodedData = redis.call('ZSCORE', USER_SCORES_SET, userId)
+    if not encodedData then
+        return {0, -1, 0, 0, 0}  -- 如果用户不存在，返回分数 0，排名 -1，和所有水果数量 0
+    end
+
+    local currentScore, apple, banana, kiwi, lastUpdate = decodeUserData(encodedData)
+
+    -- 计算新的分数
+    local timeDiff = getTimediff(now, lastUpdate)
+    local scoreIncrease = calculateScore(apple, banana, kiwi, timeDiff)
+    local newScore = currentScore + scoreIncrease
+
+    -- 编码新的用户数据
+    local newEncodedData = encodeUserData(newScore, apple, banana, kiwi, now)
+
+    -- 更新 sorted set
+    redis.call('ZADD', USER_SCORES_SET, newEncodedData, userId)
+
+    -- 获取更新后的排名
+    local rank = redis.call('ZREVRANK', USER_SCORES_SET, userId)
+
+    return {newScore, rank, apple, banana, kiwi}
+end
+
+-- 根据传入的参数决定执行哪个函数
+if #ARGV == 1 then
+    return updateAllScores(KEYS, ARGV)
+elseif #ARGV == 5 then
+    return updateSingleUserScore(KEYS, ARGV)
+elseif #ARGV == 2 then
+    return updateScoreAndGetRank(KEYS, ARGV)
+else
+    return redis.error_reply("Invalid number of arguments")
+end
