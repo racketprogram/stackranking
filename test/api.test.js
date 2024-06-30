@@ -103,7 +103,7 @@ describe('Staking Points API Tests - Part 2', function () {
     userId = response.data.id;
   });
 
-  it('should stake more assets and check score after 10 seconds', async () => {
+  it('should stake more assets and check score after 2 seconds', async () => {
     // Stake more assets
     const stakeResponse = await axios.post(`${API_URL}/user/${userId}/stake`, {
       apple: 1,
