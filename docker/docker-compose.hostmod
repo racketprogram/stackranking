@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    environment:
+      POSTGRES_USER: user1
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  redis-node1:
+    build:
+      context: redis
+    network_mode: "host"
+    restart: always
+    entrypoint: ["redis-server", "/etc/redis/rediscluster.conf", "--port", "7000"]
+
+  redis-node2:
+    build:
+      context: redis
+    network_mode: "host"
+    restart: always
+    entrypoint: ["redis-server", "/etc/redis/rediscluster.conf", "--port", "7001"]
+
+  redis-node3:
+    build:
+      context: redis
+    network_mode: "host"
+    restart: always
+    entrypoint: ["redis-server", "/etc/redis/rediscluster.conf", "--port", "7002"]
+
+  redis-node4:
+    build:
+      context: redis
+    network_mode: "host"
+    restart: always
+    entrypoint: ["redis-server", "/etc/redis/rediscluster.conf", "--port", "7003"]
+
+  redis-node5:
+    build:
+      context: redis
+    network_mode: "host"
+    restart: always
+    entrypoint: ["redis-server", "/etc/redis/rediscluster.conf", "--port", "7004"]
+
+  redis-node6:
+    build:
+      context: redis
+    network_mode: "host"
+    restart: always
+    entrypoint: ["redis-server", "/etc/redis/rediscluster.conf", "--port", "7005"]
+
+  # ... (其他 redis 節點類似配置)
+
+  redis-cluster-creator:
+    image: redis
+    network_mode: "host"
+    entrypoint: ["/bin/sh", "-c", "echo 'yes' | redis-cli --cluster create 127.0.0.1:7000 127.0.0.1:7001 127.0.0.1:7002 127.0.0.1:7003 127.0.0.1:7004 127.0.0.1:7005 --cluster-replicas 0"]
+    depends_on:
+      - redis-node1
+      - redis-node2
+      - redis-node3
+      - redis-node4
+      - redis-node5
+      - redis-node6
+
+volumes:
+  postgres_data:
+  redis_data:
