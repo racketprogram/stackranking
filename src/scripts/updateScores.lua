@@ -1,11 +1,11 @@
 -- 計算分數的輔助函數
--- local function calculateScore(apple, banana, kiwi, timeDiff)
---     return apple * 100 * timeDiff + banana * 20 * timeDiff + kiwi * 10 * timeDiff
--- end
-
 local function calculateScore(apple, banana, kiwi, timeDiff)
-    return apple * 1 * timeDiff + banana * 1 * timeDiff + kiwi * 1 * timeDiff
+    return apple * 100 * timeDiff + banana * 20 * timeDiff + kiwi * 10 * timeDiff
 end
+
+-- local function calculateScore(apple, banana, kiwi, timeDiff)
+--     return apple * 1 * timeDiff + banana * 1 * timeDiff + kiwi * 1 * timeDiff
+-- end
 
 -- 更新单个用户的分数（使用增量值）
 local function updateSingleUserScore(KEYS, ARGV)
