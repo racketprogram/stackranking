@@ -7,7 +7,7 @@ let task;
 // 导出定时任务的控制接口，以便在应用程序中手动启动和停止
 module.exports = {
   start: () => {
-    task = cron.schedule('*/30 * * * * *', async () => {
+    task = cron.schedule('1 * * * * *', async () => {
       try {
         const startTime = new Date();
         const updatedCount = await redisService.updateAllScores(getTimenow());
